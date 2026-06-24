@@ -1,0 +1,17 @@
+streamlit==1.40.0
+python-dotenv==1.0.1
+requests==2.32.3
+
+llama-index-core==0.11.23
+llama-index-vector-stores-chroma==0.2.0
+llama-index-embeddings-huggingface==0.3.1
+chromadb==0.5.20
+
+torch==2.1.0
+torchvision==0.16.0
+sentence-transformers==3.0.1
+transformers==4.44.0
+
+pytesseract==0.3.13
+pdf2image==1.17.0
+pillow==10.4.0
