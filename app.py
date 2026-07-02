@@ -20,22 +20,22 @@ import chromadb
 import pytesseract
 from pdf2image import convert_from_path
 
-# ── Konfigurasi OCR ────────────────────────────────────
+# ── OCR Configuration ────────────────────────────────────
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 POPPLER_PATH = r"C:\Program Files\Release-26.02.0-0\poppler-26.02.0\Library\bin"
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# ── Pakai embedding lokal — tidak butuh API key ──────
+# ── Use local embedding — no API key needed ──────
 Settings.embed_model = HuggingFaceEmbedding(
     model_name="paraphrase-multilingual-MiniLM-L12-v2"
 )
-# Matikan LLM default LlamaIndex — kita handle sendiri
+# Turn off LLM default LlamaIndex
 Settings.llm = None
 
 
-# ── Deteksi apakah teks PDF hasil scan (garbage) atau asli ──
+# ── Detect whether the PDF text is from a scan or original ──
 def is_text_garbage(text: str) -> bool:
     """Cek apakah teks hasil extract terlihat seperti garbage/scan."""
     if len(text.strip()) == 0:
@@ -65,7 +65,7 @@ def load_documents_with_ocr_fallback(docs_folder: str):
     """Load semua PDF; kalau terdeteksi scan, proses ulang pakai OCR."""
     docs = SimpleDirectoryReader(docs_folder).load_data()
 
-    # Kelompokkan dulu per file_name (satu file bisa pecah jadi beberapa Document/halaman)
+    # First, group by filename (a single file can be split into multiple documents / pages)
     by_file = {}
     for d in docs:
         fname = d.metadata.get("file_name", "unknown")
@@ -88,7 +88,7 @@ def load_documents_with_ocr_fallback(docs_folder: str):
     return final_docs
 
 
-# ── Gemini via REST API, dengan retry otomatis ────────
+# ── Gemini via REST API, with automation retry ────────
 def ask_gemini(prompt: str, max_retries: int = 3) -> str:
     url = (
         "https://generativelanguage.googleapis.com"
@@ -105,14 +105,14 @@ def ask_gemini(prompt: str, max_retries: int = 3) -> str:
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
             last_error = e
-            # 503/timeout = server sibuk, coba lagi setelah jeda singkat
+            # 503/timeout = server is busy, Try again after a brief pause.
             if attempt < max_retries:
                 time.sleep(2 * attempt)  # 2s, 4s, ...
                 continue
             raise last_error
 
 
-# ── Load dokumen & buat index (atau load index yang sudah ada) ──
+# ── Load documents and create index (or load an existing index) ──
 @st.cache_resource(show_spinner="Memuat dokumen regulasi (PDF hasil scan akan di-OCR, mohon tunggu)...")
 def load_index():
     db = chromadb.PersistentClient(path="./chroma_db")
@@ -121,12 +121,12 @@ def load_index():
     ctx = StorageContext.from_defaults(vector_store=store)
 
     if col.count() > 0:
-        # Index sudah pernah dibuat — langsung load, tidak re-proses
+        # The index has already been created—it loads directly and is not reprocessed
         index = VectorStoreIndex.from_vector_store(
             vector_store=store, storage_context=ctx
         )
     else:
-        # Pertama kali jalan — proses semua PDF, dengan OCR untuk yang hasil scan
+        # Initial run — process all PDFs, using OCR for scanned documents
         docs = load_documents_with_ocr_fallback("docs")
         index = VectorStoreIndex.from_documents(docs, storage_context=ctx)
 
@@ -167,7 +167,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Sidebar — info dokumen ──────────────────────────────
+# ── Sidebar — document info ──────────────────────────────
 with st.sidebar:
     st.markdown("### 🏛️ RAG Regulasi Indonesia")
     st.caption("Tanya jawab regulasi Indonesia berbasis AI")
